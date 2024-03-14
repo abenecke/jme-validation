@@ -140,7 +140,6 @@ class MakePlots():
         #read in tau histos and create eff
         #2D hist of pT and eta
         self.tauefflist = list(set([ re.sub(r'_\d','',el.GetName().replace("_denum","").replace("_num","").replace("_pteta","").replace("_TAU","")) for el in f_.GetListOfKeys() if "TAU" in el.GetName()]))
-        self.TauEffs = OrderedDict()
         for el in self.tauefflist:
             self.GetEffPurity(f_,"TAU",selection_name=el, quant = "pteta")
 
@@ -150,8 +149,6 @@ class MakePlots():
         for name, graph in self.graphs.items():
             graph.Write(name)
         for name, hist in self.hists.items():
-            hist.Write(name)
-        for name, hist in self.TauEffs.items():
             hist.Write(name)
 
         for f_ in self.files.values():

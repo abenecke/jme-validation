@@ -443,3 +443,78 @@ def efftauPlots(taus, jets, sel, sel_tag, ntaus = 3, deltaRcut = 0.4, bPNet = Tr
 
     return plots
     
+
+
+
+def customefftauPlots(taus, jets, addcol, sel, sel_tag, ntaus = 3, deltaRcut = 0.4, bPNet = True):
+    plots = []
+    nums = []
+    denums = []
+
+    #sort tau by pT
+    taus = op.sort(taus, lambda j: -j.pt)
+
+    # create binning
+    etaBinning = [etabin[0] for etatag, etabin in eta_binning.items() if "0p0to5p2" not in etatag]
+    etaBinning+= [etabin[1] for etatag, etabin in eta_binning.items() if "0p0to5p2" not in etatag and etabin[1] not in etaBinning] 
+    etaBinning = VarBin(etaBinning)
+    # etaBinning = VarBin([0.0,2.0])
+    ptBinning = VarBin([0.,10.,20.,25.,30.,35.,40.,45.,50.,55.,60.,65.,70.,75.,80.,85.,90.,100.])
+    
+    # match each reco tau to closest jet
+    for ix in range(ntaus):
+        tau = taus[ix]
+        recojet =  op.rng_min_element_by(jets, lambda jet: op.deltaR(jet.p4,tau.p4))
+        addrecojet =  op.rng_min_element_by(addcol, lambda jet: op.deltaR(jet.p4,tau.p4))
+
+        denum_sel = op.AND(op.rng_len(taus)>ix, op.rng_len(addcol)>0,op.deltaR(addrecojet.p4,tau.p4)<0.2)
+        num_sel = op.AND(
+            denum_sel,
+            op.deltaR(recojet.p4,tau.p4)<deltaRcut, 
+            op.rng_len(jets)>0
+        )
+
+            
+        nums.append( Plot.make2D(f"{sel_tag}_TAU_pteta_num_"+str(ix),
+                                   (op.switch(
+                                       num_sel,
+                                       tau.pt,
+                                       -99.
+                                   ),
+                                   op.abs(tau.eta)),
+                                   sel,
+                                   (ptBinning, etaBinning),
+                                   xTitle="#tau p_{T}",
+                                   yTitle="|#eta|"
+                               )
+                   )
+
+        denums.append( Plot.make2D(f"{sel_tag}_TAU_pteta_denum_"+str(ix),
+                                   (op.switch(
+                                       denum_sel,
+                                       tau.pt,
+                                       -99.
+                                   ),
+                                   op.abs(tau.eta)),
+                                   sel,
+                                   (ptBinning, etaBinning),
+                                   xTitle="#tau p_{T}",
+                                   yTitle="|#eta|"
+                               )
+                   )
+
+
+
+        jets = op.select(jets, lambda j: j.idx!=recojet.idx)
+        addcol = op.select(addcol, lambda j: j.idx!=addrecojet.idx)
+    
+    plots.append(SummedPlot(f"{sel_tag}_TAU_pteta_num", nums, xTitle="#tau p_{T}",yTitle="|#eta|"))
+    plots.append(SummedPlot(f"{sel_tag}_TAU_pteta_denum", denums, xTitle="#tau p_{T}",yTitle="|#eta|"))
+
+    plots+=[num for num in nums]
+    plots+=[denum for denum in denums]
+
+    return plots
+    
+
+

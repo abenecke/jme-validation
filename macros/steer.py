@@ -44,6 +44,7 @@ def main():
     # campaigns = { 'mc':'Summer22EENOMINAL'}
     # extra_info = {'withCHS': True}
     jecs = {'mc': 'Summer22EERun3_V0_MC', 'data': 'Summer22EERun3_RunF_V0_DATA'} # default
+    # jecs = {'mc': 'Summer22EEFromPV2Tau4GeV2022_USER_MC', 'data': 'Summer22EERun3_RunF_V0_DATA'} # 
 
 
     ###### prompt data taking
