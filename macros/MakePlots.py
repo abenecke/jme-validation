@@ -6,6 +6,7 @@ from math import sqrt
 from collections import OrderedDict
 from tdrstyle_JME import *
 import tdrstyle_JME as TDR
+from src.binnings import eta_binning, response_pt_binning
 rt.gROOT.SetBatch(rt.kTRUE)
 rt.gStyle.SetOptStat(0)
 rt.gStyle.SetOptFit(0)
@@ -68,10 +69,9 @@ def Confidence(h1, median, confLevel = 0.95):
 
 class MakePlots():
     def __init__(self, year, path, fname, pdfextraname='', campaign = '',jec_algo=('','')):
-        # self.eta_bins = ['0p0to5p2', '0p0to1p3','1p3to2p4','2p4to2p7','2p7to3p0','3p0to5p2']
         self.eta_bins = ['0p0to1p3','1p3to2p4','2p4to2p7','2p7to3p0','3p0to5p2']
         # self.eta_bins = ['0p0to1p3']
-        self.pt_bins = ['15to17','17to20','20to23','23to27','27to30','30to35','35to40','40to45','45to57','57to72','72to90','90to120','120to150','150to200','200to300','300to400','400to550','550to750','750to1000','1000to1500','1500to2000','2000to2500','2500to3000','3000to3500','3500to4000','4000to4500','4500to5000']
+        self.pt_bins = [el.replace('pt','') for el in response_pt_binning ]
         # self.pt_bins = ['150to200']
 
         self.types = {
@@ -191,6 +191,11 @@ class MakePlots():
 
         orig_hname = f'{selection_name}_ratio'
         orig_hist = f_.Get(orig_hname)
+        line_plus=[]
+        line_minus=[]
+        MCtruth_dict = OrderedDict()
+        eta_list = []
+        pt_list = []
         for z_bin in range(1, orig_hist.GetNbinsZ()+1):
             pts, jes, jer, pts_err, jes_err, jer_err = ([],[],[],[],[], [])
             eta_bin = self.eta_bins[z_bin-1]
@@ -221,17 +226,30 @@ class MakePlots():
                 jes_err.append(getMedianError(hist))
                 jer_err.append(hist.GetRMSError())
                 if "raw" in response_name: 
+                    # filling dict with correction factor values, eta_list and pt_list, needed to store values in correction file in the right order: lowest negative eta to highest positive eta, pT increasing
                     if pt_min == 15: pt_min = 0
                     eta_min, eta_max = eta_bin.replace("p",".").split("to")
-                    line_plus = f"%s    %s    %i    %i    %i   %i  %i    %.2f \n"%(eta_min, eta_max, pt_min, pt_max, 3,0,200, 1./self.quant_y[0])
-                    line_minus = f"%s    %s    %i    %i    %i   %i  %i    %.2f \n"%("-"+eta_min,"-" + eta_max, pt_min, pt_max, 3,0,200, 1./self.quant_y[0])
-                    f.write(line_plus)
-                    f.write(line_minus)
+                    MCtruth_dict[str(eta_min)+str(eta_max)+str(pt_min)+str(pt_max)] = 1./self.quant_y[0]
+                    if (eta_min,eta_max) not in eta_list:
+                        eta_list.append((eta_min,eta_max))
+                    if (pt_min,pt_max) not in pt_list:
+                        pt_list.append((pt_min,pt_max))
+
+
                 
             # print("jes",jes)
             # print("jer",jer)
             self.graphs[selection_name+response_name+eta_bin+'jes'] = rt.TGraphErrors(len(pts), array('d',pts), array('d',jes), array('d',pts_err), array('d',jes_err))
             self.graphs[selection_name+response_name+eta_bin+'jer'] = rt.TGraphErrors(len(pts), array('d',pts), array('d',jer), array('d',pts_err), array('d',jer_err))
+        if "raw" in response_name:
+            for eta_min,eta_max in reversed(eta_list):
+                for pt_min, pt_max in pt_list:
+                    f.write(f"%s    %s    %i    %i    %i   %i  %i    %.2f \n"%("-"+eta_max,"-" + eta_min, pt_min, pt_max, 3,0,200,MCtruth_dict[str(eta_min)+str(eta_max)+str(pt_min)+str(pt_max)]))
+            
+            # writing correction file in correct order of eta and pt
+            for eta_min,eta_max in eta_list: 
+                for pt_min, pt_max in pt_list:
+                    f.write(f"%s    %s    %i    %i    %i   %i  %i    %.2f \n"%(eta_min, eta_max, pt_min, pt_max, 3,0,200, MCtruth_dict[str(eta_min)+str(eta_max)+str(pt_min)+str(pt_max)]))
 
 
     def GetEffPurity(self, f_, effPurity = "eff", selection_name="dijet",quant="pteta"):
