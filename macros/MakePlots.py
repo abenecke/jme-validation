@@ -97,6 +97,7 @@ class MakePlots():
         self.files = OrderedDict()
         self.hists = OrderedDict()
         self.graphs = OrderedDict()
+        self.METgraphs = OrderedDict()
         self.files[self.fname] = rt.TFile(os.path.join(self.inputPath,f'{self.fname}.root'))
         f_ = self.files[self.fname]
         # remove response names, that do not exist
@@ -143,11 +144,18 @@ class MakePlots():
         for el in self.tauefflist:
             self.GetEffPurity(f_,"TAU",selection_name=el, quant = "pteta")
 
+        self.GetMET(f_)
+        self.GetMET(f_, response_name = "resolution_upar")
+        self.GetMET(f_, response_name = "resolution_uper")
                 
     def Close(self):
         self.files['save'] = rt.TFile(os.path.join(self.outputPath, 'resp_eff_pur_plots.root'), 'Recreate')
         for name, graph in self.graphs.items():
             graph.Write(name)
+
+        for name, graph in self.METgraphs.items():
+            graph.Write(name)
+
         for name, hist in self.hists.items():
             hist.Write(name)
 
@@ -160,6 +168,7 @@ class MakePlots():
         XMin, XMax = (15, 7500)
         YMin, YMax = (0.9,1.1) if zoom else (0.0,2.)
         if 'resolution' in canvName.lower(): YMin, YMax = (0.0,0.5)
+        if 'upar' in canvName.lower() or 'uper' in canvName.lower(): YMin, YMax = (10.0,25.0)
         if 'tau' in canvName.lower(): 
             YMin, YMax = (0.7,1.1)
             XMin, XMax = (15, 200)
@@ -252,6 +261,42 @@ class MakePlots():
                     f.write(f"%s    %s    %i    %i    %i   %i  %i    %.2f \n"%(eta_min, eta_max, pt_min, pt_max, 3,0,200, MCtruth_dict[str(eta_min)+str(eta_max)+str(pt_min)+str(pt_max)]))
 
 
+    def GetMET(self, f_, selection_name="Zmasscut",response_name = "response_pt"):
+
+        orig_hname = f'{selection_name}_MET_{response_name}'
+        orig_hist = f_.Get(orig_hname)
+        pts, jes, jer, pts_err, jes_err, jer_err = ([],[],[],[],[], [])
+        for y_bin in range(1, orig_hist.GetNbinsY()+1):
+            hname = f'{selection_name}_{response_name}_pt{y_bin}'
+            # print("hname",hname)
+
+            hist = rt.TH1D(hname, hname, orig_hist.GetNbinsX(), orig_hist.GetXaxis().GetXmin(), orig_hist.GetXaxis().GetXmax())
+
+            # Calculate the product for each X bin
+            for x_bin in range(1, orig_hist.GetNbinsX() + 1):
+                value_y = orig_hist.GetBinContent(x_bin, y_bin)
+                error_y = orig_hist.GetBinError(x_bin, y_bin)
+
+                # Add the product to the corresponding bin in the current TH1 histogram
+                hist.SetBinContent(x_bin, value_y)
+                hist.SetBinError(x_bin, error_y)
+
+
+            hist.GetQuantiles(1,self.quant_y,self.quant)
+            pts.append(orig_hist.GetYaxis().GetBinCenter(y_bin))
+            pts_err.append(orig_hist.GetYaxis().GetBinWidth(y_bin)/2)
+            jes.append(self.quant_y[0])
+            jer.append(Confidence(hist, hist.GetMean(), confLevel = 0.87)/(2*1.514))
+            jes_err.append(getMedianError(hist))
+            jer_err.append(hist.GetRMSError())
+            
+                
+        print("pts",pts)
+        print("jes",jes)
+            # print("jer",jer)
+        self.METgraphs[selection_name+response_name+'jes'] = rt.TGraphErrors(len(pts), array('d',pts), array('d',jes if "response" in response_name else jer), array('d',pts_err), array('d',jes_err if "response" in response_name else jer_err))
+        
+
     def GetEffPurity(self, f_, effPurity = "eff", selection_name="dijet",quant="pteta"):
         den_hname = f'{selection_name}_{effPurity}_{quant}_denum'
         den_2Dhist = f_.Get(den_hname)
@@ -329,6 +374,16 @@ class MakePlots():
             tdrDraw(hist, 'P', fstyle=0)
             # tdrDraw(h, opt, marker=rt.kFullCircle, msize=1.0, mcolor=rt.kBlack, lstyle=rt.kSolid, lcolor=-1, fstyle=1001, fcolor=rt.kYellow+1, alpha=-1):
             self.canv.SaveAs(os.path.join(self.outputPath,  hname + self.pdfextraname + '.pdf'))
+
+    def PlotMET(self, selection_name="Zmasscut", response_name = "response_pt"):
+        self.CreateCanvas(canvName="MET_"+response_name+"_"+selection_name, zoom=True)
+        for name, graph in self.METgraphs.items():
+            if not selection_name in name: continue
+            if not response_name in name: continue
+            tdrDraw(graph, 'P', fstyle=0)
+            # self.leg.AddEntry(graph, info['legend'], 'lp')
+        self.canv.SaveAs(os.path.join(self.outputPath, 'MET_'+response_name+'_'+selection_name + self.pdfextraname + '.pdf'))
+        
     
     def PlotAll(self):
         self.LoadInputs()
@@ -344,6 +399,10 @@ class MakePlots():
         self.PlotEffPurity(effPurity="purity")
         for el in self.tauefflist:
             self.PlotEffPurity(effPurity="TAU",selection_name = el)
+
+        self.PlotMET()
+        self.PlotMET(response_name = "resolution_uper")
+        self.PlotMET(response_name = "resolution_upar")
         self.Close()
 
 

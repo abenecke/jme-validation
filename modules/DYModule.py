@@ -90,6 +90,7 @@ class DYModule(NanoBaseJME):
             plots+=cp.AK4jetPlots(ak4JetsID, noSel, "noSelJetID")
             plots+=cp.AK4jetPlots(ak4Jetspt40, noSel, "noSelJetpt40")
             plots+=cp.eventPlots(tree, noSel, "noSel")
+            plots+=cp.METPlots(tree, noSel, "noSel", Zboson)
 
             ### two leptons
             plots+=cp.muonPlots(muons, hasTwoSFLeptons, "hasTwoSFLeptons")
@@ -99,6 +100,7 @@ class DYModule(NanoBaseJME):
             ### zmass cut
             plots+=cp.muonPlots(muons, Zmasscut, "Zmasscut")
             plots+=cp.electronPlots(electrons, Zmasscut, "Zmasscut")
+            plots+=cp.METPlots(tree, Zmasscut, "Zmasscut", Zboson)
             plots+=cp.ZbosonPlots(Zboson, Zmasscut, "Zmasscut")
             plots+=cp.AK4jetPlots(ak4Jets, Zmasscut, "Zmasscut")
             plots+=cp.AK4jetPlots(ak4JetsID, Zmasscut, "ZmasscutJetID")

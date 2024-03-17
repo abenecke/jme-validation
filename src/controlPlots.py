@@ -518,3 +518,43 @@ def customefftauPlots(taus, jets, addcol, sel, sel_tag, ntaus = 3, deltaRcut = 0
     
 
 
+def METPlots(tree, sel, sel_tag, Zboson):
+    plots = []
+
+    plots.append(Plot.make1D(f"{sel_tag}_MET_pt",tree.MET.pt,sel,EqBin(200,0.,400.),xTitle = "MET pt"))
+    plots.append(Plot.make1D(f"{sel_tag}_MET_phi",tree.MET.phi,sel,EqBin(100,-4.,4.),xTitle = "MET phi"))
+
+    ptBinning = VarBin([ptbin[0] for pttag, ptbin in pt_binning.items()][:-1])
+
+    # MET response
+    hadronicRecoil = op.sum(tree.MET.p4, -Zboson)
+    Zpx= Zboson.px()/Zboson.pt()
+    Zpy= Zboson.py()/Zboson.pt()
+    upar = op.sum(op.product(hadronicRecoil.px(), Zpx),op.product(hadronicRecoil.py(), Zpy))
+    uper = op.sqrt(op.pow(hadronicRecoil.pt(),2)- op.pow(upar,2))
+
+    plots.append(Plot.make2D(f"{sel_tag}_MET_response_pt",
+                             ( -upar/Zboson.pt(),Zboson.pt()),
+                             sel,
+                             (EqBin(100,0,2), EqBin(50,0,200)),
+                             xTitle="MET response",
+                             yTitle="Z p_{T}"
+                         ))
+
+    plots.append(Plot.make2D(f"{sel_tag}_MET_resolution_upar",
+                             ( -upar-Zboson.pt(),Zboson.pt()),
+                             sel,
+                             (EqBin(100,0,100), EqBin(50,0,200)),
+                             xTitle="MET resolution upar",
+                             yTitle="Z p_{T}"
+                         ))
+
+    plots.append(Plot.make2D(f"{sel_tag}_MET_resolution_uper",
+                             ( uper,Zboson.pt()),
+                             sel,
+                             (EqBin(100,0,100), EqBin(50,0,200)),
+                             xTitle="MET resolution uper",
+                             yTitle="Z p_{T}"
+                         ))
+
+    return plots

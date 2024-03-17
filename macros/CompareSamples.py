@@ -9,6 +9,7 @@ class CompareSamples():
         self.tausel = tausel
         self.histsname = histsname
         self.refsample = refsample
+        self.METnames = ['resolution_uperjes','resolution_uparjes','response_ptjes']
         if self.refsample is None:
             self.refsample = list(self.samples.keys())[0]
         self.year = year
@@ -73,10 +74,11 @@ class CompareSamples():
                 h.SetDirectory(0)
                 self.hists[sname+'purity'+eta_bin] = h
                 
-                h = self.files[sname+'resp_eff_pur'].Get(f'dijet_AK4responseresponse{eta_bin}jer')
+                sel_tag = 'dijet' if 'QCD' in self.pdfextraname else 'Zmasscut'
+                h = self.files[sname+'resp_eff_pur'].Get(f'{sel_tag}_AK4responseresponse{eta_bin}jer')
                 self.hists[sname+'jer'+eta_bin] = h
                 
-                h = self.files[sname+'resp_eff_pur'].Get(f'dijet_AK4responseresponse{eta_bin}jes')
+                h = self.files[sname+'resp_eff_pur'].Get(f'{sel_tag}_AK4responseresponse{eta_bin}jes')
                 self.hists[sname+'jes'+eta_bin] = h
 
                 if "2p7to3p0" in eta_bin or "3p0to5p2" in eta_bin: continue
@@ -93,23 +95,12 @@ class CompareSamples():
                         # print(sname+el)
                         self.hists[sname+el] = h
 
+            #### MET plots
+            for histname in self.METnames:
+                # print('Zmasscut'+histname)
+                h = self.files[sname+'resp_eff_pur'].Get('Zmasscut'+histname)
+                self.hists[sname+'MET'+histname] = h
 
-                    # h = self.files[sname+'resp_eff_pur'].Get(f'{sel_tag}_taueff_leadingtau0p2_TAU_pteta_eta{eta_bin}')
-                    # h.SetDirectory(0)
-                    # self.hists[sname+f'{sel_tag}tau_leadingtau0p2_{eta_bin}'] = h
-
-                    # if "NOMINAL" in sname:
-                    #     h = self.files[sname+'resp_eff_pur'].Get(f'{sel_tag}CHS_taueff_leadingtau0p2_TAU_pteta_eta{eta_bin}')
-                    #     h.SetDirectory(0)
-                    #     self.hists[f'CHS{sel_tag}tau_leadingtau0p2_{eta_bin}'] = h
-                    #     h = self.files[sname+'resp_eff_pur'].Get(f'{sel_tag}Tau_taueff_leadingtau0p2_TAU_pteta_eta{eta_bin}')
-                    #     h.SetDirectory(0)
-                    #     self.hists[f'Tau{sel_tag}tau_leadingtau0p2_{eta_bin}'] = h
-                    #     print("HPS taus",f'{sel_tag}HPSTau_taueff_leadingtau0p2_TAU_pteta_eta{eta_bin}')
-                    #     h = self.files[sname+'resp_eff_pur'].Get(f'{sel_tag}HPSTau_taueff_leadingtau0p2_TAU_pteta_eta{eta_bin}')
-                    #     h.SetDirectory(0)
-                    #     self.hists[f'HPSTau{sel_tag}tau_leadingtau0p2_{eta_bin}'] = h
-    
                 
     def Close(self):
         for f_ in self.files.values():
@@ -143,6 +134,7 @@ class CompareSamples():
             rt.gPad.SetLogy()
         self.canv.SaveAs(os.path.join(self.outputPath, f'{histname}{self.pdfextraname}.pdf'))
         self.canv.Close()
+
     
     def PlotEff(self, eta_bin, quant = 'eff',sel_tag = ''):
         if not any([x in self.pdfextraname for x in ['QCD', 'DY']]): return
@@ -156,7 +148,7 @@ class CompareSamples():
 
         h_ref = self.hists[self.refsample+quant+eta_bin]
         h_ref_ratio = self.hists[self.refsample+quant+eta_bin].Clone('h_ref_ratio')
-        eta_min, eta_max = eta_bin.replace('p','.').split('to')
+        eta_min, eta_max =[0.0,5.2] if eta_bin == '' else eta_bin.replace('p','.').split('to')
         TDR.extraText3 = []
         TDR.extraText3.append(f'{eta_min} < |#eta| < {eta_max}')
         if '99' not in taustatus: TDR.extraText3.append(f'Tau.status = {taustatus}')
@@ -167,12 +159,17 @@ class CompareSamples():
             Y_min,Y_max = (0.5,1.3)
             X_min,X_max = (20,100) 
             ratioy_min,ratioy_max = (0.85,2) 
+        if "MET" in quant: 
+            Y_min,Y_max = (10,20) if 'resolution' in quant else (0,2)
+            X_min,X_max = (10,200) 
+            ratioy_min,ratioy_max = (0.95,1.05) 
+
         self.canv = tdrDiCanvas(eta_bin, X_min,X_max, Y_min,Y_max, ratioy_min, ratioy_max, 'p_{T}^{gen}',quant if not "tau" in quant else "Eff.", f'Var./{self.refsample}')
         # self.canv = tdrDiCanvas(eta_bin, x_min, y_max, 1e-04, 1, 0.5, 1.5, eta_bin, 'A.U.', 'Ratio')
         # self.canv.cd(1).SetLogy(True)
-        # if not "tau" in quant:
-        #     self.canv.cd(1).SetLogx(True)
-        #     self.canv.cd(2).SetLogx(True)
+        if not "tau" in quant:
+            self.canv.cd(1).SetLogx(True)
+            self.canv.cd(2).SetLogx(True)
         FixXAsisPartition(self.canv.cd(2), shift=0.77, textsize=0.11, bins=[30,300,3000])
         self.canv.cd(1)
         self.leg  = tdrLeg(0.40,0.90-(len(self.samples)+1)*0.040,0.90,0.90)
@@ -271,6 +268,11 @@ class CompareSamples():
                             tmp_dict[name] = self.hists[name]
 
                         self.PlotHistos(tmp_dict, f"NOMINALcustomSelHPSTauvsHPSTau_taueff_leadingtau0p2_TAU_pteta_eta{eta_bin}", eta_bin)
+
+        ### MET plots
+        for histname in self.METnames:
+            self.PlotEff(eta_bin='',quant='MET'+histname)
+
         self.Close()
 
 
@@ -307,6 +309,7 @@ def main():
 
     ###### DYTau
     histsname =["noJetSel_taueff_leadingtau0p2_matchedjet_PNetTauvsJet_0","noJetSel_taueff_leadingtau0p2_jet1_PNetTauvsJet","noJetSel_taueff_leadingtau0p2_jet_PNetTauvsJet"]
+    histsname =['noSel_MET_pt','noSel_MET_phi']
     # names+=["FromPV2Tau0GeV"]
     for name in names:
         samples[name] = f'outputs/DYModule/DY_2022_G_Summer22EE{name}_Summer22EERun3_V0_MC_Summer22EERun3_RunF_V0_DATA/results/DYTau.root'
@@ -316,6 +319,15 @@ def main():
     # MP = CompareSamples(samples=samples, histsname=histsname, pdfextraname=pdfextraname, outputPath = 'outputs/DYModule/',refsample = 'NOMINAL',tausel = ["noJetSel","noJetSeltaustatus0","noJetSeltaustatus1","noJetSeltaustatus2","noJetSeltaustatus10","noJetSeltaustatus11","noJetSeltaustatus15"]).PlotAll()
 
     MP = CompareSamples(samples=samples, histsname=histsname, pdfextraname=pdfextraname, outputPath = 'outputs/DYModule/',refsample = 'NOMINAL',tausel = ["customSel"]).PlotAll() #,"customSeltaustatus0","customSeltaustatus1","customSeltaustatus2","customSeltaustatus10","customSeltaustatus11","customSeltaustatus15"]).PlotAll()
+
+
+    histsname =['Zmasscut_MET_pt','Zmasscut_MET_phi']
+    for name in names:
+        samples[name] = f'outputs/DYModule/DY_2022_G_Summer22EE{name}_Summer22EERun3_V0_MC_Summer22EERun3_RunF_V0_DATA/results/DY.root'
+    
+    pdfextraname = '_DY'
+
+    MP = CompareSamples(samples=samples, histsname=histsname, pdfextraname=pdfextraname, outputPath = 'outputs/DYModule/DY/',refsample = 'NOMINAL',tausel = []).PlotAll() 
 
     
 
